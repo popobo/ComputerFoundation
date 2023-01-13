@@ -1,7 +1,9 @@
 #include <isa.h>
+#include "debug.h"
 #include "expr.h"
 #include "watchpoint.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -28,7 +30,7 @@ static char* rl_gets() {
 }
 
 static int cmd_c(char *args) {
-  cpu_exec(-1);
+  cpu_exec(0);
   return 0;
 }
 
@@ -39,6 +41,8 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 
+static int cmd_si();
+
 static struct {
   char *name;
   char *description;
@@ -47,12 +51,26 @@ static struct {
   { "help", "Display informations about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-
-  /* TODO: Add more commands */
+  { "si", "Execute instructions by step", cmd_si}
 
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
+
+static int cmd_si(char *args) {
+	long steps = 0;
+	steps = strtol(args, NULL, 10);
+	
+	Log("steps: %ld", steps);
+	
+	if (steps <= 0) {
+		steps = 1;
+	}
+
+	cpu_exec((uint64_t)steps);
+
+	return 0;
+}
 
 static int cmd_help(char *args) {
   /* extract the first argument */

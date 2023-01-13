@@ -22,6 +22,9 @@ static inline def_EHelper(store) {
 
 
 static inline void fetch_decode_exec(DecodeExecState *s) {
+  // fetch instruction
+  // pc is 4 bytes(32bits)
+  // val is the same as opcode1_0 because of union
   s->isa.instr.val = instr_fetch(&s->seq_pc, 4);
   Assert(s->isa.instr.i.opcode1_0 == 0x3, "Invalid instruction");
   switch (s->isa.instr.i.opcode6_2) {

@@ -16,6 +16,7 @@
 // restrict the size of log file
 #define LOG_END   (1024 * 1024 * 50)
 
+
 CPU_state cpu = {};
 NEMUState nemu_state = { .state = NEMU_STOP };
 static uint64_t g_nr_guest_instr = 0;
@@ -75,7 +76,10 @@ void cpu_exec(uint64_t n) {
   uint64_t timer_start = get_time();
 
   for (; n > 0; n --) {
-    vaddr_t this_pc = cpu.pc;
+    // vaddr_t is uint32_t, this pc is current pc in cpu
+	vaddr_t this_pc = cpu.pc;
+	
+	Log("n:%ld, this_pc:" FMT_WORD "\n", n, this_pc);
 
     /* Execute one instruction, including instruction fetch,
      * instruction decode, and the actual execution. */

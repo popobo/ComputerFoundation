@@ -21,6 +21,7 @@
 #define CASE_ENTRY(idx, id, ex, w) case idx: set_width(s, w); id(s); ex(s); break;
 
 static inline uint32_t instr_fetch(vaddr_t *pc, int len) {
+  //get instruction by pc
   uint32_t instr = vaddr_ifetch(*pc, len);
 #ifdef DEBUG
   uint8_t *p_instr = (void *)&instr;
@@ -30,6 +31,7 @@ static inline uint32_t instr_fetch(vaddr_t *pc, int len) {
     strcatf(log_bytebuf, "%02x ", p_instr[i]);
   }
 #endif
+  //Update pc
   (*pc) += len;
   return instr;
 }

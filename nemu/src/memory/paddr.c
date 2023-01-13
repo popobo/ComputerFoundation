@@ -1,3 +1,5 @@
+#include "common.h"
+#include "macro.h"
 #include <isa.h>
 #include <memory/paddr.h>
 #include <memory/vaddr.h>
@@ -56,6 +58,7 @@ static inline void pmem_write(paddr_t addr, word_t data, int len) {
 /* Memory accessing interfaces */
 
 inline word_t paddr_read(paddr_t addr, int len) {
+  // in_pmem is to check whether addr is legal
   if (in_pmem(addr)) return pmem_read(addr, len);
   else return map_read(addr, len, fetch_mmio_map(addr));
 }
@@ -68,6 +71,14 @@ inline void paddr_write(paddr_t addr, word_t data, int len) {
 word_t vaddr_mmu_read(vaddr_t addr, int len, int type);
 void vaddr_mmu_write(vaddr_t addr, word_t data, int len);
 
+/**
+ * word_t vaddr_ifetch4(vaddr_t addr) {
+ * }
+ *
+ * for now 
+ * isa_vaddr_check always return MEM_RET_OK
+ * 
+ * */
 
 #define def_vaddr_template(bytes) \
 word_t concat(vaddr_ifetch, bytes) (vaddr_t addr) { \
