@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <isa.h>
 #include "common.h"
 #include "debug.h"
@@ -50,6 +51,8 @@ static int cmd_info(char *args);
 
 static int cmd_x(char *args);
 
+static int cmd_p(char *args);
+
 static struct {
   char *name;
   char *description;
@@ -61,6 +64,7 @@ static struct {
   { "si", "Execute instructions by step", cmd_si},
   { "info", "Print Regiser state", cmd_info},
   { "x", "Scan Memory", cmd_x},
+  { "p", "Get the value of expression", cmd_p},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -160,6 +164,18 @@ static int cmd_x(char *args) {
 	}
 
 	printf("\n");
+
+	return 0;
+}
+
+static int cmd_p(char *args) {
+	assert(args != NULL);
+
+	Log("args: %s", args);
+
+	bool isExprSuc = 0;
+
+	expr(args, &isExprSuc);	
 
 	return 0;
 }

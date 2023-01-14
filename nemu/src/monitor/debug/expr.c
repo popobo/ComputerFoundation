@@ -4,10 +4,12 @@
  * Type 'man regex' for more information about POSIX regex functions.
  */
 #include <regex.h>
+#include <string.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ,
-
+  TK_NOTYPE = 256,
+  TK_DIGIT,
+  TK_EQ,
   /* TODO: Add more token types */
 
 };
@@ -22,7 +24,13 @@ static struct rule {
    */
 
   {" +", TK_NOTYPE},    // spaces
+  {"[0-9]+", TK_DIGIT},  
   {"\\+", '+'},         // plus
+  {"-", '-'},
+  {"\\*", '*'},
+  {"\\/", '/'},
+  {"\\(", '('},
+  {"\\)", ')'},
   {"==", TK_EQ},        // equal
 };
 
@@ -47,13 +55,17 @@ void init_regex() {
   }
 }
 
+#define TOKEN_STR_LEN 32
+
 typedef struct token {
   int type;
-  char str[32];
+  char str[TOKEN_STR_LEN];
 } Token;
 
-static Token tokens[32] __attribute__((used)) = {};
-static int nr_token __attribute__((used))  = 0;
+#define TOKEN_ARR_LEN 32
+
+static Token tokens[TOKEN_ARR_LEN] = {};
+static int nr_token  = 0;
 
 static bool make_token(char *e) {
   int position = 0;
@@ -78,11 +90,46 @@ static bool make_token(char *e) {
          * to record the token in the array `tokens'. For certain types
          * of tokens, some extra actions should be performed.
          */
+		
+		if (nr_token >= TOKEN_ARR_LEN) {
+			Log("Too many token in the expression");
+			return false;
+		}
 
         switch (rules[i].token_type) {
-          default: TODO();
+			case TK_NOTYPE:
+				break;
+			case TK_DIGIT:
+				tokens[nr_token].type = TK_DIGIT;
+				if (substr_len > TOKEN_STR_LEN) {
+					Log("dight is too long");
+					return false;
+				}
+				memcpy(tokens[nr_token].str, substr_start, substr_len);
+				nr_token++;
+				break;
+			case '+':
+				tokens[nr_token++].type = '+';
+				break;
+			case '-':
+				tokens[nr_token++].type = '-';
+				break;
+			case '*':
+				tokens[nr_token++].type = '*';
+				break;
+			case '/':
+				tokens[nr_token++].type = '/';
+				break;
+			case '(':
+				tokens[nr_token++].type = '(';
+				break;
+			case ')':
+				tokens[nr_token++].type = ')';
+				break;
+			default:
+				Log("token is not dealt, token%s\n", substr_start);
         }
-
+		
         break;
       }
     }
@@ -93,6 +140,10 @@ static bool make_token(char *e) {
     }
   }
 
+	for (int i = 0; i < nr_token; ++i) {
+		Log("tokens type: %d, tokens str: %s", tokens[i].type, tokens[i].str);
+	}
+
   return true;
 }
 
@@ -102,9 +153,6 @@ word_t expr(char *e, bool *success) {
     *success = false;
     return 0;
   }
-
-  /* TODO: Insert codes to evaluate the expression. */
-  TODO();
 
   return 0;
 }
