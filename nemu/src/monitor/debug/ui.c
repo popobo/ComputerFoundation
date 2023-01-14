@@ -1,9 +1,12 @@
 #include <isa.h>
+#include "common.h"
 #include "debug.h"
 #include "expr.h"
+#include "memory/paddr.h"
 #include "watchpoint.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -41,7 +44,11 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 
-static int cmd_si();
+static int cmd_si(char *args);
+
+static int cmd_info(char *args);
+
+static int cmd_x(char *args);
 
 static struct {
   char *name;
@@ -51,26 +58,12 @@ static struct {
   { "help", "Display informations about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-  { "si", "Execute instructions by step", cmd_si}
-
+  { "si", "Execute instructions by step", cmd_si},
+  { "info", "Print Regiser state", cmd_info},
+  { "x", "Scan Memory", cmd_x},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
-
-static int cmd_si(char *args) {
-	long steps = 0;
-	steps = strtol(args, NULL, 10);
-	
-	Log("steps: %ld", steps);
-	
-	if (steps <= 0) {
-		steps = 1;
-	}
-
-	cpu_exec((uint64_t)steps);
-
-	return 0;
-}
 
 static int cmd_help(char *args) {
   /* extract the first argument */
@@ -93,6 +86,82 @@ static int cmd_help(char *args) {
     printf("Unknown command '%s'\n", arg);
   }
   return 0;
+}
+
+static int cmd_si(char *args) {
+	long steps = 0;
+	
+	steps = args != NULL ? strtol(args, NULL, 10) : 1;
+
+	Log("steps: %ld", steps);
+	
+	if (steps <= 0) {
+		steps = 1;
+	}
+
+	cpu_exec((uint64_t)steps);
+
+	return 0;
+}
+
+static int cmd_info(char *args) {
+	if (NULL == args || strlen(args) != 1) {
+		Log("failed to info");
+		return 0;
+	}
+
+	char opt = args[0];
+
+    switch (opt) {
+		case 'r': 
+			isa_reg_display();
+			break;
+		case 'w': 
+			break;
+    }		
+
+	return 0;
+}
+
+static int cmd_x(char *args) {
+	if (NULL == args) {
+		Log("failed to x");
+		return 0;
+	}
+	
+	char *str = args;
+	char *token = NULL;
+	char *saveptr = NULL;
+	long numberOfBytes = 0;
+	uint32_t  memoryAddress = 0;
+
+	Log("args:%s", args);
+	
+	for(int i = 0; ; i++, str = NULL) {
+		token = strtok_r(str, " ", &saveptr);
+		if (NULL == token) {
+			break;
+		}
+		
+		if (0 == i) {
+			numberOfBytes = strtol(token, NULL, 10);
+		}
+
+		if (1 == i) {
+			memoryAddress = (uint32_t)strtol(token, NULL, 16);
+		}
+	}
+
+	Log("numberOfBytes:%ld, memoryAddress:0x%08x", numberOfBytes, memoryAddress);
+
+	for (int i = 0; i < numberOfBytes; ++i) {
+		word_t byte = paddr_read(memoryAddress + i, 1);
+		printf("%x ", byte);
+	}
+
+	printf("\n");
+
+	return 0;
 }
 
 void ui_mainloop() {

@@ -1,4 +1,5 @@
 #include <isa.h>
+#include <stdio.h>
 #include "local-include/reg.h"
 
 const char *regs[] = {
