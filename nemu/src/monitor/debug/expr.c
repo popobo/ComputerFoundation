@@ -154,9 +154,10 @@ static bool make_token(char *e) {
 
 static bool check_parentheses(int front, int end) {
 	int numberOfLB = 0;
+	bool result = true;
 
 	if (tokens[front].type != '(' || tokens[end].type != ')') {
-		return false;
+		return result;
 	}
 	
 	for (int i = front; i < end + 1; ++i) {
@@ -167,16 +168,22 @@ static bool check_parentheses(int front, int end) {
 			--numberOfLB;
 		}
 
-		if (numberOfLB < 0) {
-			return false;	
+		
+		if (numberOfLB == 0 && i != end) {
+			result = false;
+		}
+		else if (numberOfLB < 0) {
+			// In this case, the expression is illegal
+			result = false;	
 		}
 	}
 
-	if (numberOfLB > 0) {
-		return false;
+	if (numberOfLB > 0) {	
+		// In this case, the expression is illegal
+		result = false;
 	}
 
-	return true;
+	return result;
 }
 
 static int find_main_operator(int front, int end, bool *success) {
