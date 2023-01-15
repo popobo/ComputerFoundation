@@ -156,32 +156,40 @@ static bool check_parentheses(int front, int end) {
 	int numberOfLB = 0;
 	bool result = true;
 
-	if (tokens[front].type != '(' || tokens[end].type != ')') {
-		return result;
-	}
-	
-	for (int i = front; i < end + 1; ++i) {
-		if (tokens[i].type == '(') {
-			++numberOfLB;
-		}
-		else if (tokens[i].type == ')') {
-			--numberOfLB;
-		}
-
-		
-		if (numberOfLB == 0 && i != end) {
+	do {
+		if (tokens[front].type != '(' || tokens[end].type != ')') {
 			result = false;
+			break;
 		}
-		else if (numberOfLB < 0) {
-			// In this case, the expression is illegal
-			result = false;	
-		}
-	}
+		
+		for (int i = front; i < end + 1; ++i) {
+			if (tokens[i].type == '(') {
+				++numberOfLB;
+			}
+			else if (tokens[i].type == ')') {
+				--numberOfLB;
+			}
 
-	if (numberOfLB > 0) {	
-		// In this case, the expression is illegal
-		result = false;
-	}
+			
+			if (numberOfLB == 0 && i != end) {
+				result = false;
+				// we wanna see whether this expression is illegal
+				// so no break here
+			}
+			else if (numberOfLB < 0) {
+				// In this case, the expression is illegal
+				result = false;
+				break;
+			}
+		}
+
+		if (numberOfLB > 0) {	
+			// In this case, the expression is illegal
+			result = false;
+			break;
+		}
+	} while(false);
+
 
 	return result;
 }
@@ -235,6 +243,7 @@ static int find_main_operator(int front, int end, bool *success) {
 
 static int eval(int front, int end, bool *success) {
 	Log("front:%d, end:%d", front, end);
+
 	if (front > end) {
 		return 0;
 	}
