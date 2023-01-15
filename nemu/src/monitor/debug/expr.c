@@ -152,26 +152,30 @@ static bool make_token(char *e) {
   return true;
 }
 
-static bool check_parentheses(int front, int end) {
+static bool check_parentheses(int front, int end, bool *is_prarentthesises_legal) {
 	int numberOfLB = 0;
 	bool result = true;
-
+	bool is_ever_in_parenthesised = false;
+	if (is_prarentthesises_legal != NULL) {
+		*is_prarentthesises_legal = true;
+	}
+	
 	do {
 		if (tokens[front].type != '(' || tokens[end].type != ')') {
 			result = false;
-			break;
+			// need to tell whether this expression is illegal, so do not return
 		}
 		
 		for (int i = front; i < end + 1; ++i) {
 			if (tokens[i].type == '(') {
 				++numberOfLB;
+				is_ever_in_parenthesised = true;
 			}
 			else if (tokens[i].type == ')') {
 				--numberOfLB;
 			}
-
 			
-			if (numberOfLB == 0 && i != end) {
+			if (is_ever_in_parenthesised && numberOfLB == 0 && i != end) {
 				result = false;
 				// we wanna see whether this expression is illegal
 				// so no break here
@@ -179,6 +183,9 @@ static bool check_parentheses(int front, int end) {
 			else if (numberOfLB < 0) {
 				// In this case, the expression is illegal
 				result = false;
+				if (is_prarentthesises_legal != NULL){
+					*is_prarentthesises_legal = false;
+				}
 				break;
 			}
 		}
@@ -186,6 +193,9 @@ static bool check_parentheses(int front, int end) {
 		if (numberOfLB > 0) {	
 			// In this case, the expression is illegal
 			result = false;
+			if (is_prarentthesises_legal != NULL) {
+				*is_prarentthesises_legal = false;
+			}
 			break;
 		}
 	} while(false);
@@ -194,7 +204,8 @@ static bool check_parentheses(int front, int end) {
 	return result;
 }
 
-static int find_main_operator(int front, int end, bool *success) {
+
+static int find_main_operator(int front, int end, bool *is_main_operator_found) {
 	bool is_in_par = false;
 	int operators[TOKEN_ARR_LEN] = {};
 	int index = 0;
@@ -235,57 +246,92 @@ static int find_main_operator(int front, int end, bool *success) {
 			assert(0);
 		}
 	}
-	if (success != NULL) {
-		*success = index > 0 ? true : false;
+	
+	if (is_main_operator_found != NULL) {
+		*is_main_operator_found = index > 0 ? true : false;
 	}
+	
 	return main_op_index;
 }
 
-static int eval(int front, int end, bool *success) {
+typedef struct eval_status {
+	bool is_front_end_correct;
+	bool is_prarentthesises_legal;
+	bool is_main_operator_found;
+} eval_status;
+
+static word_t eval(int front, int end, eval_status * status) {
 	Log("front:%d, end:%d", front, end);
+	
+	word_t result = 0;
+	bool is_front_end_correct = true;
+	bool is_prarentthesises_legal = true;
+	bool is_main_operator_found = true;
 
-	if (front > end) {
-		return 0;
-	}
-	else if (front == end) {
-		word_t value = 0;
-		if (tokens[front].type == TK_DIGIT) {
-			value = (word_t)strtol(tokens[front].str, NULL, 10);
+	do {	
+		if (front > end) {
+			result = 0;
+			is_front_end_correct = false;
 		}
-		return value;
-	}
-	else if (check_parentheses(front, end) == true) {
-		return eval(front + 1, end - 1, success);
-	}
-	else {
-		bool find_main_operator_success = false;
-		int main_op_index = find_main_operator(front, end, &find_main_operator_success);
-		word_t val1 = eval(front, main_op_index - 1, success);
-		word_t val2 = eval(main_op_index + 1, end, success);
+		else if (front == end) {
+			if (tokens[front].type == TK_DIGIT) {
+				result = (word_t)strtol(tokens[front].str, NULL, 10);
+			}
+			break;
+		}
+		else if (check_parentheses(front, end, &is_prarentthesises_legal) == true) {
+			result = eval(front + 1, end - 1, status);
+		}
+		else {
+			if (false == is_prarentthesises_legal) {
+				result = 0;
+				break;
+			}
+			int main_op_index = find_main_operator(front, end, &is_main_operator_found);
+			word_t val1 = eval(front, main_op_index - 1, status);
+			word_t val2 = eval(main_op_index + 1, end, status);
 
-		switch (tokens[main_op_index].type) {
-			case '+':
-				return val1 + val2;
-			case '-':
-				return val1 - val2;
-			case '*':
-				return val1 * val2;
-			case '/':
-				return val1 / val2;
-			default:
-				assert(0);
+			switch (tokens[main_op_index].type) {
+				case '+':
+				    result = val1 + val2;
+					break;
+				case '-':
+					result = val1 - val2;
+					break;
+				case '*':
+					result = val1 * val2;
+					break;
+				case '/':
+					result = val1 / val2;
+					break;
+				default:
+					assert(0);
+			}
 		}
+
+	} while(false);
+		
+	if (status != NULL) {
+		status->is_front_end_correct = status->is_front_end_correct && is_front_end_correct;
+		status->is_main_operator_found = status->is_main_operator_found && is_main_operator_found;
+		status->is_prarentthesises_legal = status->is_prarentthesises_legal && is_prarentthesises_legal;
 	}
-	return 0;
+
+	return result;
 }
 
 word_t expr(char *e, bool *success) {
-  if (!make_token(e)) {
-    *success = false;
-    return 0;
-  }
+	if (!make_token(e)) {
+		*success = false;
+		return 0;
+	}
+	
+	eval_status status = {true, true, true};
+	int value =  eval(0, nr_token - 1, &status);
+	
+	Log("is_front_end_correct:%d," 
+		"is_main_operator_found:%d," 
+		" is_prarentthesises_legal:%d", status.is_front_end_correct, status.is_main_operator_found, status.is_prarentthesises_legal);
 
-  int value =  eval(0, nr_token - 1, success);
-
-  return value;
+	return value;
 }
