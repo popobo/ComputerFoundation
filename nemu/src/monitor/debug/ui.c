@@ -175,7 +175,9 @@ static int cmd_p(char *args) {
 
 	bool isExprSuc = 0;
 
-	expr(args, &isExprSuc);	
+	word_t value = expr(args, &isExprSuc);	
+	
+	printf("value:%d\n", value);
 
 	return 0;
 }

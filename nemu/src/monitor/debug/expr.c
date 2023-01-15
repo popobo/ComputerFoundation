@@ -1,10 +1,15 @@
+#include "common.h"
+#include "debug.h"
+#include <assert.h>
 #include <isa.h>
 
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
  */
 #include <regex.h>
+#include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 enum {
   TK_NOTYPE = 256,
@@ -147,6 +152,116 @@ static bool make_token(char *e) {
   return true;
 }
 
+static bool check_parentheses(int front, int end) {
+	int numberOfLB = 0;
+
+	if (tokens[front].type != '(' || tokens[end].type != ')') {
+		return false;
+	}
+	
+	for (int i = front; i < end + 1; ++i) {
+		if (tokens[i].type == '(') {
+			++numberOfLB;
+		}
+		else if (tokens[i].type == ')') {
+			--numberOfLB;
+		}
+
+		if (numberOfLB < 0) {
+			return false;	
+		}
+	}
+
+	if (numberOfLB > 0) {
+		return false;
+	}
+
+	return true;
+}
+
+static int find_main_operator(int front, int end, bool *success) {
+	bool is_in_par = false;
+	int operators[TOKEN_ARR_LEN] = {};
+	int index = 0;
+	int main_op_index = 0;
+	for (int i = front; i < end + 1; ++i) {
+		if ('(' == tokens[i].type) {
+			is_in_par = true;
+		}
+		else if (')' == tokens[i].type) {
+			is_in_par = false;
+		}
+		else if ('+' == tokens[i].type ||
+			     '-' == tokens[i].type || 
+				 '*' == tokens[i].type ||
+				 '/' == tokens[i].type) {
+			if (true == is_in_par) {
+				continue;
+			}
+			operators[index++] = i; 
+		}
+	}
+	
+	main_op_index = operators[0];
+	for (int i = 0; i < index; ++i) {
+		switch (tokens[operators[i]].type) {
+		case '+':
+		case '-':
+			main_op_index = operators[i];
+			break;
+		case '*':
+		case '/':
+			if ('*' == tokens[main_op_index].type ||
+				'/' == tokens[main_op_index].type) {
+				main_op_index = operators[i];
+			}
+			break;
+		default:
+			assert(0);
+		}
+	}
+	if (success != NULL) {
+		*success = index > 0 ? true : false;
+	}
+	return main_op_index;
+}
+
+static int eval(int front, int end, bool *success) {
+	Log("front:%d, end:%d", front, end);
+	if (front > end) {
+		return 0;
+	}
+	else if (front == end) {
+		word_t value = 0;
+		if (tokens[front].type == TK_DIGIT) {
+			value = (word_t)strtol(tokens[front].str, NULL, 10);
+		}
+		return value;
+	}
+	else if (check_parentheses(front, end) == true) {
+		return eval(front + 1, end - 1, success);
+	}
+	else {
+		bool find_main_operator_success = false;
+		int main_op_index = find_main_operator(front, end, &find_main_operator_success);
+		word_t val1 = eval(front, main_op_index - 1, success);
+		word_t val2 = eval(main_op_index + 1, end, success);
+
+		switch (tokens[main_op_index].type) {
+			case '+':
+				return val1 + val2;
+			case '-':
+				return val1 - val2;
+			case '*':
+				return val1 * val2;
+			case '/':
+				return val1 / val2;
+			default:
+				assert(0);
+		}
+	}
+	return 0;
+}
 
 word_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -154,5 +269,7 @@ word_t expr(char *e, bool *success) {
     return 0;
   }
 
-  return 0;
+  int value =  eval(0, nr_token - 1, success);
+
+  return value;
 }
