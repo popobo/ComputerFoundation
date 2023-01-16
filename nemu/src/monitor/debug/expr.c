@@ -232,11 +232,22 @@ static int find_main_operator(int front, int end, bool *is_main_operator_found) 
 	for (int i = 0; i < index; ++i) {
 		switch (tokens[operators[i]].type) {
 		case '+':
-		case '-':
 			main_op_index = operators[i];
 			break;
+		case '-': {
+			int preceded_token_index = operators[i] - 1;
+			// preceded_token_index should not beyond front
+			// this expression begin with '-'
+			// the preceded token is not dight, so this is a negative sign
+			if (preceded_token_index != front && 
+				TK_DIGIT ==  tokens[preceded_token_index].type) {
+				main_op_index = operators[i];
+			}
+			break;
+		}
 		case '*':
 		case '/':
+			// TODO
 			if ('*' == tokens[main_op_index].type ||
 				'/' == tokens[main_op_index].type) {
 				main_op_index = operators[i];
@@ -260,10 +271,10 @@ typedef struct eval_status {
 	bool is_main_operator_found;
 } eval_status;
 
-static word_t eval(int front, int end, eval_status * status) {
+static long eval(int front, int end, eval_status * status) {
 	Log("front:%d, end:%d", front, end);
 	
-	word_t result = 0;
+	long result = 0;
 	bool is_front_end_correct = true;
 	bool is_prarentthesises_legal = true;
 	bool is_main_operator_found = true;
@@ -275,7 +286,15 @@ static word_t eval(int front, int end, eval_status * status) {
 		}
 		else if (front == end) {
 			if (tokens[front].type == TK_DIGIT) {
-				result = (word_t)strtol(tokens[front].str, NULL, 10);
+				result = strtol(tokens[front].str, NULL, 10);
+			}
+			break;
+		}
+		// This can be a negative number
+		else if (end - front == 1) {
+			if (tokens[front].type == '-' &&
+				tokens[end].type == TK_DIGIT) {
+				result = -strtol(tokens[end].str, NULL, 10);
 			}
 			break;
 		}
@@ -288,8 +307,8 @@ static word_t eval(int front, int end, eval_status * status) {
 				break;
 			}
 			int main_op_index = find_main_operator(front, end, &is_main_operator_found);
-			word_t val1 = eval(front, main_op_index - 1, status);
-			word_t val2 = eval(main_op_index + 1, end, status);
+			long val1 = eval(front, main_op_index - 1, status);
+			long val2 = eval(main_op_index + 1, end, status);
 
 			switch (tokens[main_op_index].type) {
 				case '+':
@@ -327,11 +346,11 @@ word_t expr(char *e, bool *success) {
 	}
 	
 	eval_status status = {true, true, true};
-	int value =  eval(0, nr_token - 1, &status);
+	long value =  eval(0, nr_token - 1, &status);
 	
 	Log("is_front_end_correct:%d," 
 		"is_main_operator_found:%d," 
-		" is_prarentthesises_legal:%d", status.is_front_end_correct, status.is_main_operator_found, status.is_prarentthesises_legal);
+		" is_prarentthesises_legal:%d, value:%ld", status.is_front_end_correct, status.is_main_operator_found, status.is_prarentthesises_legal, value);
 
-	return value;
+	return (word_t)value;
 }
