@@ -6,6 +6,8 @@ ifeq ($(filter $(ISAS), $(ISA)), ) # ISA must be valid
 $(error Invalid ISA. Supported: $(ISAS))
 endif
 
+TEST_EXPR ?= NO
+
 ENGINE ?= interpreter
 ENGINES = $(shell ls src/engine/)
 ifeq ($(filter $(ENGINES), $(ENGINE)), ) # ENGINE must be valid
@@ -15,6 +17,10 @@ endif
 $(info Building $(ISA)-$(NAME)-$(ENGINE))
 
 INC_DIR += ./include ./src/engine/$(ENGINE)
+#ifeq TEST_EXPR
+INC_DIR += src/monitor/debug
+#endif
+
 BUILD_DIR ?= ./build
 
 ifdef SHARE
@@ -59,6 +65,7 @@ include Makefile.git
 
 .DEFAULT_GOAL = app
 
+
 # Compilation flags
 CC = gcc
 LD = gcc
@@ -68,7 +75,14 @@ CFLAGS   += -O2 -MMD -Wall -Werror -ggdb3 $(INCLUDES) \
             -D__ISA__=$(ISA) -D__ISA_$(ISA)__ -D_ISA_H_=\"isa/$(ISA).h\"
 
 # Files to be compiled
+ifeq ($(TEST_EXPR), YES)
+$(info 1 $(TEST_EXPR))
+$(shell cp tools/gen-expr/gen-expr.c src/)
+SRCS = $(shell find src/ -name "*.c" | grep -v "isa\|engine\|main.c")
+$(info %(SRCS))
+else
 SRCS = $(shell find src/ -name "*.c" | grep -v "isa\|engine")
+endif
 SRCS += $(shell find src/isa/$(ISA) -name "*.c")
 SRCS += $(shell find src/engine/$(ENGINE) -name "*.c")
 OBJS = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
