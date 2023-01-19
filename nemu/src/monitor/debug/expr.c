@@ -66,8 +66,6 @@ typedef struct token {
   char str[TOKEN_STR_LEN];
 } Token;
 
-#define TOKEN_ARR_LEN 32
-
 static Token tokens[TOKEN_ARR_LEN] = {};
 static int nr_token  = 0;
 
@@ -205,22 +203,22 @@ static bool check_parentheses(int front, int end, bool *is_prarentthesises_legal
 
 
 static int find_main_operator(int front, int end, bool *is_main_operator_found) {
-	bool is_in_par = false;
+	int number_of_lb = 0;
 	int operators[TOKEN_ARR_LEN] = {};
 	int index = 0;
 	int main_op_index = 0;
 	for (int i = front; i < end + 1; ++i) {
 		if ('(' == tokens[i].type) {
-			is_in_par = true;
+			++number_of_lb;
 		}
 		else if (')' == tokens[i].type) {
-			is_in_par = false;
+			--number_of_lb;
 		}
 		else if ('+' == tokens[i].type ||
 			     '-' == tokens[i].type || 
 				 '*' == tokens[i].type ||
 				 '/' == tokens[i].type) {
-			if (true == is_in_par) {
+			if (number_of_lb > 0) {
 				continue;
 			}
 			operators[index++] = i; 
@@ -239,7 +237,8 @@ static int find_main_operator(int front, int end, bool *is_main_operator_found) 
 			// this expression begin with '-'
 			// the preceded token is not dight, so this is a negative sign
 			if (preceded_token_index != front && 
-				TK_DIGIT ==  tokens[preceded_token_index].type) {
+				(TK_DIGIT ==  tokens[preceded_token_index].type|| 
+				 ')' == tokens[preceded_token_index].type)) {
 				main_op_index = operators[i];
 			}
 			break;
@@ -270,10 +269,10 @@ typedef struct eval_status {
 	bool is_main_operator_found;
 } eval_status;
 
-static long eval(int front, int end, eval_status * status) {
+static double eval(int front, int end, eval_status * status) {
 	Log("front:%d, end:%d", front, end);
 	
-	long result = 0;
+	double result = 0;
 	bool is_front_end_correct = true;
 	bool is_prarentthesises_legal = true;
 	bool is_main_operator_found = true;
@@ -306,8 +305,8 @@ static long eval(int front, int end, eval_status * status) {
 				break;
 			}
 			int main_op_index = find_main_operator(front, end, &is_main_operator_found);
-			long val1 = eval(front, main_op_index - 1, status);
-			long val2 = eval(main_op_index + 1, end, status);
+			double val1 = eval(front, main_op_index - 1, status);
+			double val2 = eval(main_op_index + 1, end, status);
 
 			switch (tokens[main_op_index].type) {
 				case '+':
@@ -320,7 +319,9 @@ static long eval(int front, int end, eval_status * status) {
 					result = val1 * val2;
 					break;
 				case '/':
-					result = val1 / val2;
+					if (val2 != 0) {
+						result = val1 / val2;
+					}
 					break;
 				default:
 					assert(0);
@@ -340,16 +341,24 @@ static long eval(int front, int end, eval_status * status) {
 
 word_t expr(char *e, bool *success) {
 	if (!make_token(e)) {
-		*success = false;
+		if (success != NULL)
+			*success = false;
 		return 0;
 	}
 	
 	eval_status status = {true, true, true};
-	long value =  eval(0, nr_token - 1, &status);
-	
+	double value =  eval(0, nr_token - 1, &status);
+	memset(tokens, 0, sizeof(tokens));
+
 	Log("is_front_end_correct:%d," 
 		"is_main_operator_found:%d," 
-		" is_prarentthesises_legal:%d, value:%ld", status.is_front_end_correct, status.is_main_operator_found, status.is_prarentthesises_legal, value);
+		" is_prarentthesises_legal:%d, value:%lf", status.is_front_end_correct, status.is_main_operator_found, status.is_prarentthesises_legal, value);
+
+	if (value > UINT32_MAX) {
+		return 0;
+	}
+
+	value += 0.5; // for round
 
 	return (word_t)value;
 }

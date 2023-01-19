@@ -5,6 +5,8 @@
 
 #define TOKEN_STR_LEN 32
 
+#define TOKEN_ARR_LEN 32
+
 word_t expr(char *, bool *);
 
 #endif

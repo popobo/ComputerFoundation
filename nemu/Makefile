@@ -74,6 +74,8 @@ CFLAGS   += -O2 -MMD -Wall -Werror -ggdb3 $(INCLUDES) \
             -D__ENGINE_$(ENGINE)__ \
             -D__ISA__=$(ISA) -D__ISA_$(ISA)__ -D_ISA_H_=\"isa/$(ISA).h\"
 
+$(info $(INCLUDES))
+
 # Files to be compiled
 ifeq ($(TEST_EXPR), YES)
 $(info 1 $(TEST_EXPR))

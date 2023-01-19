@@ -6,6 +6,7 @@
 #include "memory/paddr.h"
 #include "watchpoint.h"
 
+#include <regex.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +54,10 @@ static int cmd_x(char *args);
 
 static int cmd_p(char *args);
 
+static int cmd_testp(char *args);
+
+static int cmd_testp1(char *args);
+
 static struct {
   char *name;
   char *description;
@@ -65,6 +70,8 @@ static struct {
   { "info", "Print Regiser state", cmd_info},
   { "x", "Scan Memory", cmd_x},
   { "p", "Get the value of expression", cmd_p},
+  { "testp", "test p", cmd_testp},
+  { "testp1", "test p", cmd_testp1},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -178,6 +185,108 @@ static int cmd_p(char *args) {
 	word_t value = expr(args, &isExprSuc);	
 	
 	printf("value:%d\n", value);
+
+	return 0;
+}
+
+static int cmd_testp(char *args) {
+	if (NULL == args) {
+		return -1;
+	}
+	
+	char *file = strtok(args, " ");
+	if (NULL == file) {
+		file = args;
+	}
+
+	Log("test_file: %s", file);
+	
+	FILE *fp = fopen(file, "r");
+	if (NULL == fp) {
+		return -1;
+	}
+	
+	FILE *result_fp = fopen("/tmp/compare_result", "w+");
+	if (NULL == result_fp) {
+		return -1;
+	}
+
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read_len = 0;
+	int index = 0;
+	word_t expr_result = 0;
+	word_t actual_result = 0;
+	char buffer[65536] = {};
+	while((read_len = getline(&line, &len, fp)) != -1) {
+		if (index % 2 == 0) {
+			line[read_len - 1] = '\0';
+			memcpy(buffer, line, read_len);
+			expr_result = expr(line, NULL);
+		} else {
+			line[read_len -1] = '\0';
+			actual_result = (word_t)strtol(line, NULL, 10);
+			Log("expr_result:%d, actual_result:%d", expr_result, actual_result);
+			int deviation = actual_result - expr_result;
+			if (deviation > 1 || deviation < -1) {
+				fprintf(result_fp, "%s\n%d\n", buffer, actual_result);
+			}
+		}
+		index++;
+	}
+
+	if (fp != NULL)
+		fclose(fp);
+	if (result_fp != NULL)
+		fclose(result_fp);
+
+	if (line != NULL)
+		free(line);
+
+	return 0;
+}
+
+static int cmd_testp1(char *args) {
+	if (NULL == args) {
+		return -1;
+	}
+
+	char *file = strtok(args, " ");
+	if (NULL == file) {
+		file = args;
+	}
+
+	Log("test_file: %s", file);
+	
+	FILE *fp = fopen(file, "r");
+	if (NULL == fp) {
+		return -1;
+	}
+	
+
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read_len = 0;
+	int index = 0;
+	word_t expr_result = 0;
+	word_t actual_result = 0;
+	while((read_len = getline(&line, &len, fp)) != -1) {
+		if (index % 2 == 0) {
+			line[read_len - 1] = '\0';
+			expr_result = expr(line, NULL);
+		} else {
+			line[read_len -1] = '\0';
+			actual_result = (word_t)strtol(line, NULL, 10);
+			Log("expr_result:%d, actual_result:%d", expr_result, actual_result);
+		}
+		index++;
+	}
+
+	if (fp != NULL)
+		fclose(fp);
+
+	if (line != NULL)
+		free(line);
 
 	return 0;
 }
