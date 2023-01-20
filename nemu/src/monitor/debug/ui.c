@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <string.h>
 
 void cpu_exec(uint64_t);
 int is_batch_mode();
@@ -54,6 +55,10 @@ static int cmd_x(char *args);
 
 static int cmd_p(char *args);
 
+static int cmd_w(char *args);
+
+static int cmd_d(char *args);
+
 static int cmd_testp(char *args);
 
 static int cmd_testp1(char *args);
@@ -66,12 +71,14 @@ static struct {
   { "help", "Display informations about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-  { "si", "Execute instructions by step", cmd_si},
-  { "info", "Print Regiser state", cmd_info},
-  { "x", "Scan Memory", cmd_x},
-  { "p", "Get the value of expression", cmd_p},
-  { "testp", "test p", cmd_testp},
-  { "testp1", "test p", cmd_testp1},
+  { "si", "Execute instructions by step", cmd_si },
+  { "info", "Print Regiser state", cmd_info },
+  { "x", "Scan Memory", cmd_x },
+  { "p", "Get the value of expression", cmd_p },
+  { "w", "Add a watchpoint", cmd_w },
+  { "d", "Delete a watchpoint by no", cmd_d },
+  { "testp", "test p", cmd_testp },
+  { "testp1", "test p", cmd_testp1 },
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -128,6 +135,7 @@ static int cmd_info(char *args) {
 			isa_reg_display();
 			break;
 		case 'w': 
+			info_wp();
 			break;
     }		
 
@@ -137,7 +145,7 @@ static int cmd_info(char *args) {
 static int cmd_x(char *args) {
 	if (NULL == args) {
 		Log("failed to x");
-		return 0;
+		return -1;
 	}
 	
 	char *str = args;
@@ -185,6 +193,51 @@ static int cmd_p(char *args) {
 	word_t value = expr(args, &isExprSuc);	
 	
 	printf("value:%d\n", value);
+
+	return 0;
+}
+
+static int cmd_w(char *args) {
+	if (NULL == args) {
+		return -1;
+	}
+
+	WP *nwp = NULL;
+	bool new_wb_success = new_wp(&nwp);
+	if (false == new_wb_success || NULL == nwp) {
+		return -1;
+	}
+
+	bool success = true;
+	word_t value = expr(args, &success);
+	if (false == success) {
+		printf("cmd expresson is is illegal\n");
+		return -1;
+	}
+
+	nwp->last_expr_value = value;	
+	memcpy(nwp->expresson, args, strlen(args) + 1);
+
+	return 0;
+}
+
+static int cmd_d(char *args) {
+	if (NULL == args) {
+		return -1;
+	}
+	
+	char *end_ptr = NULL;
+	int no = (int)strtol(args, &end_ptr, 10);
+	if (args == end_ptr) {
+		Log("not watchpoint no found");
+		return -1;
+	}
+
+	bool free_ret = free_wp_by_no(no);
+	if (free_ret == false) {
+		Log("failed to free watch point");
+		return -1;
+	}
 
 	return 0;
 }

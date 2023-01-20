@@ -1,3 +1,4 @@
+#include "watchpoint.h"
 #include <isa.h>
 #include <monitor/monitor.h>
 #include <monitor/difftest.h>
@@ -79,7 +80,7 @@ void cpu_exec(uint64_t n) {
     // vaddr_t is uint32_t, this pc is current pc in cpu
 	vaddr_t this_pc = cpu.pc;
 	
-	Log("n:%ld, this_pc:" FMT_WORD "\n", n, this_pc);
+	//Log("n:%ld, this_pc:" FMT_WORD "\n", n, this_pc);
 
     /* Execute one instruction, including instruction fetch,
      * instruction decode, and the actual execution. */
@@ -93,6 +94,7 @@ void cpu_exec(uint64_t n) {
     asm_print(this_pc, seq_pc - this_pc, n < MAX_INSTR_TO_PRINT);
 
     /* TODO: check watchpoints here. */
+	traverse_wp();
 #endif
 
 #ifdef HAS_IOE

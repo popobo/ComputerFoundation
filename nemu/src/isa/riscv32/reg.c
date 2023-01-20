@@ -1,5 +1,8 @@
 #include <isa.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "common.h"
 #include "local-include/reg.h"
 
 extern CPU_state cpu;
@@ -14,13 +17,28 @@ const char *regs[] = {
 void isa_reg_display() {
 	
 	for (int i = 0; i < sizeof(regs)/sizeof(regs[0]); ++i) {
-		printf("%s\t\t\t" "0x%08x" "\t\t\t%d\n", 
+		printf("%s\t\t\t" "0x%08x" "\t\t\t%u\n", 
 				regs[i], 
-				(int)cpu.gpr[i]._32,
-				(int)cpu.gpr[i]._32);
+				cpu.gpr[i]._32,
+				cpu.gpr[i]._32);
 	}
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {
-  return 0;
+	int i = 0;
+	for (; i < sizeof(regs)/sizeof(regs[0]); ++i) {
+		if (0 == strcmp(s, regs[i])) {
+			break;	
+		}
+	}
+	if (sizeof(regs)/sizeof(regs[0]) == i) {
+		if (success != NULL)
+			*success = false;
+		return 0;
+	}
+	
+	if (success != NULL)
+		*success = true;
+	return cpu.gpr[i]._32;
 }
+

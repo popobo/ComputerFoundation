@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <isa.h>
 #include "expr.h"
+#include "isa/riscv32.h"
+#include "memory/paddr.h"
 
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
@@ -15,7 +17,13 @@
 enum {
   TK_NOTYPE = 256,
   TK_DIGIT,
+  TK_HEX,
+  TK_REG_NAME,
   TK_EQ,
+  TK_NO_EQ,
+  TK_AND,
+  TK_NEGATIVE,
+  TK_DEREF,
   /* TODO: Add more token types */
 
 };
@@ -30,7 +38,9 @@ static struct rule {
    */
 
   {" +", TK_NOTYPE},    // spaces
-  {"[0-9]+", TK_DIGIT},  
+  {"0x[0-9|a-f]+", TK_HEX},
+  {"[0-9]+", TK_DIGIT},
+  {"\\$[\\$|a-z|0-9]+", TK_REG_NAME},
   {"\\+", '+'},         // plus
   {"-", '-'},
   {"\\*", '*'},
@@ -38,6 +48,8 @@ static struct rule {
   {"\\(", '('},
   {"\\)", ')'},
   {"==", TK_EQ},        // equal
+  {"!=", TK_NO_EQ},
+  {"&&", TK_AND},
 };
 
 #define NR_REGEX (sizeof(rules) / sizeof(rules[0]) )
@@ -102,31 +114,27 @@ static bool make_token(char *e) {
 			case TK_NOTYPE:
 				break;
 			case TK_DIGIT:
-				tokens[nr_token].type = TK_DIGIT;
+			case TK_HEX:
+			case TK_REG_NAME:
+				tokens[nr_token].type = rules[i].token_type;
 				if (substr_len > TOKEN_STR_LEN) {
-					Log("dight is too long");
+					Log("too long");
 					return false;
 				}
 				memcpy(tokens[nr_token].str, substr_start, substr_len);
 				nr_token++;
 				break;
+			
 			case '+':
-				tokens[nr_token++].type = '+';
-				break;
 			case '-':
-				tokens[nr_token++].type = '-';
-				break;
 			case '*':
-				tokens[nr_token++].type = '*';
-				break;
 			case '/':
-				tokens[nr_token++].type = '/';
-				break;
 			case '(':
-				tokens[nr_token++].type = '(';
-				break;
 			case ')':
-				tokens[nr_token++].type = ')';
+			case TK_EQ:
+			case TK_NO_EQ:
+			case TK_AND:
+				tokens[nr_token++].type = rules[i].token_type;
 				break;
 			default:
 				Log("token is not dealt, token%s\n", substr_start);
@@ -202,98 +210,159 @@ static bool check_parentheses(int front, int end, bool *is_prarentthesises_legal
 }
 
 
-static int find_main_operator(int front, int end, bool *is_main_operator_found) {
+static int find_main_operator(int front, int end) {
 	int number_of_lb = 0;
 	int operators[TOKEN_ARR_LEN] = {};
 	int index = 0;
 	int main_op_index = 0;
 	for (int i = front; i < end + 1; ++i) {
-		if ('(' == tokens[i].type) {
-			++number_of_lb;
+		switch (tokens[i].type) {
+			case '(':
+				++number_of_lb;
+				break;
+			case ')':
+				--number_of_lb;
+				break;
+			case '+':
+			case '-':
+			case '*':
+			case '/':
+			case TK_EQ:
+			case TK_NO_EQ:
+			case TK_AND:
+				if (number_of_lb > 0) {
+					continue;
+				}
+				operators[index++] = i; 
+				break;
 		}
-		else if (')' == tokens[i].type) {
-			--number_of_lb;
-		}
-		else if ('+' == tokens[i].type ||
-			     '-' == tokens[i].type || 
-				 '*' == tokens[i].type ||
-				 '/' == tokens[i].type) {
-			if (number_of_lb > 0) {
-				continue;
-			}
-			operators[index++] = i; 
-		}
+	}
+
+	if (0 == index) {
+		return -1;
 	}
 	
 	main_op_index = operators[0];
 	for (int i = 0; i < index; ++i) {
-		switch (tokens[operators[i]].type) {
+		int main_op_type = tokens[main_op_index].type;
+		int i_op_type = tokens[operators[i]].type;
+		switch (i_op_type) {
 		case '+':
-			main_op_index = operators[i];
-			break;
-		case '-': {
-			int preceded_token_index = operators[i] - 1;
-			// preceded_token_index should not beyond front
-			// this expression begin with '-'
-			// the preceded token is not dight, so this is a negative sign
-			if (preceded_token_index != front && 
-				(TK_DIGIT ==  tokens[preceded_token_index].type|| 
-				 ')' == tokens[preceded_token_index].type)) {
+		case '-': 
+			if (main_op_type != TK_EQ ||
+				main_op_type != TK_NO_EQ ||
+				main_op_type != TK_AND) {
+				
 				main_op_index = operators[i];
+			
 			}
 			break;
-		}
 		case '*':
 		case '/':
-			// TODO
-			if ('*' == tokens[main_op_index].type ||
-				'/' == tokens[main_op_index].type) {
+			if (main_op_type != TK_EQ ||
+				main_op_type != TK_NO_EQ ||
+				main_op_type != TK_AND ||
+				main_op_type != '+' ||
+				main_op_type != '-') {
+				
 				main_op_index = operators[i];
 			}
+			break;
+		case TK_EQ:
+		case TK_NO_EQ:
+			if (main_op_type != TK_AND) {
+				main_op_index = operators[i];
+			}	
+		
+			break;
+		case TK_AND:
+			main_op_index = operators[i];
 			break;
 		default:
 			assert(0);
 		}
 	}
 	
-	if (is_main_operator_found != NULL) {
-		*is_main_operator_found = index > 0 ? true : false;
-	}
-	
 	return main_op_index;
 }
 
+static double eval_get_value(int index, bool *is_value_legal) {
+	double result = 0.0;
+	bool is_val_leg = true;
+
+	switch (tokens[index].type) {
+		case TK_DIGIT: {
+			char *end_ptr = NULL;
+			result = strtol(tokens[index].str, &end_ptr, 10);
+			if (end_ptr == tokens[index].str)
+				is_val_leg = false;
+			break;
+		}
+		case TK_HEX: {
+			char *end_ptr = NULL;
+			result = strtol(tokens[index].str, &end_ptr, 16);
+			if (end_ptr == tokens[index].str)
+				is_val_leg = false;
+			break;
+		}
+		case TK_REG_NAME:
+			result = isa_reg_str2val(tokens[index].str + 1, &is_val_leg);
+			break;
+		default:
+			is_val_leg = false;
+			break;
+	}
+
+	if (NULL != is_value_legal)
+		*is_value_legal = is_val_leg;
+
+	return result;
+}
+
+static double eval_without_operator(int front, int end, bool *is_value_legal) {
+	Log("front:%d, end:%d", front, end);
+	double result = 0.0;
+
+	if (TK_DIGIT == tokens[end].type ||
+		TK_REG_NAME == tokens[end].type ||
+		TK_HEX == tokens[end].type) {
+		
+		result = eval_get_value(end, is_value_legal);
+		if (NULL != is_value_legal &&
+			false == is_value_legal) {
+			return result;
+		}
+
+		for(int i = end - 1; i > -1; --i) {
+			if (TK_NEGATIVE == tokens[i].type) {
+				result = - result;
+			} else if (TK_DEREF == tokens[i].type) {
+				result = (double)paddr_read(result, 1);
+			}
+		}
+	}	
+
+	return result;
+}
+
 typedef struct eval_status {
-	bool is_front_end_correct;
 	bool is_prarentthesises_legal;
-	bool is_main_operator_found;
+	bool is_value_legal;
 } eval_status;
 
 static double eval(int front, int end, eval_status * status) {
 	Log("front:%d, end:%d", front, end);
 	
 	double result = 0;
-	bool is_front_end_correct = true;
 	bool is_prarentthesises_legal = true;
-	bool is_main_operator_found = true;
+	bool is_value_legal = true;
 
 	do {	
 		if (front > end) {
 			result = 0;
-			is_front_end_correct = false;
 		}
 		else if (front == end) {
-			if (tokens[front].type == TK_DIGIT) {
-				result = strtol(tokens[front].str, NULL, 10);
-			}
-			break;
-		}
-		// This can be a negative number
-		else if (end - front == 1) {
-			if (tokens[front].type == '-' &&
-				tokens[end].type == TK_DIGIT) {
-				result = -strtol(tokens[end].str, NULL, 10);
-			}
+			result = eval_get_value(end, &is_value_legal);
 			break;
 		}
 		else if (check_parentheses(front, end, &is_prarentthesises_legal) == true) {
@@ -304,7 +373,13 @@ static double eval(int front, int end, eval_status * status) {
 				result = 0;
 				break;
 			}
-			int main_op_index = find_main_operator(front, end, &is_main_operator_found);
+			int main_op_index = find_main_operator(front, end);
+			// deal with unary operatpr
+			if (-1 == main_op_index) {
+				result = eval_without_operator(front, end, &is_value_legal);
+				break;
+			}
+				
 			double val1 = eval(front, main_op_index - 1, status);
 			double val2 = eval(main_op_index + 1, end, status);
 
@@ -323,17 +398,26 @@ static double eval(int front, int end, eval_status * status) {
 						result = val1 / val2;
 					}
 					break;
+				case TK_EQ:
+					result = (word_t)val1 == (word_t)val2;
+					break;
+				case TK_NO_EQ:
+					result = (word_t)val1 != (word_t)val2;
+					break;
+				case TK_AND:
+					// add word_t to make sure bool is correct
+					result = (word_t)val1 && (word_t)val2;
+					break;
 				default:
-					assert(0);
+					is_value_legal = false;
 			}
 		}
 
 	} while(false);
 		
 	if (status != NULL) {
-		status->is_front_end_correct = status->is_front_end_correct && is_front_end_correct;
-		status->is_main_operator_found = status->is_main_operator_found && is_main_operator_found;
 		status->is_prarentthesises_legal = status->is_prarentthesises_legal && is_prarentthesises_legal;
+		status->is_value_legal = status->is_value_legal && is_value_legal; 
 	}
 
 	return result;
@@ -345,20 +429,46 @@ word_t expr(char *e, bool *success) {
 			*success = false;
 		return 0;
 	}
-	
-	eval_status status = {true, true, true};
+
+	for (int i = 0; i < nr_token; ++i) {
+		if (('-' == tokens[i].type || '*' == tokens[i].type) && 
+			(i == 0 || 
+			 tokens[i - 1].type == '+' || 
+			 tokens[i - 1].type == '-' ||
+			 tokens[i - 1].type == '*' ||
+			 tokens[i - 1].type == '/' ||
+			 tokens[i - 1].type == TK_EQ ||
+			 tokens[i - 1].type == TK_NO_EQ ||
+			 tokens[i - 1].type == TK_AND ||
+			 tokens[i - 1].type == '(' ||
+			 tokens[i - 1].type == TK_NEGATIVE ||
+			 tokens[i - 1].type == TK_DEREF)) {
+			if ('-' == tokens[i].type) {
+				tokens[i].type = TK_NEGATIVE;
+			} else if ('*' == tokens[i].type) {
+				tokens[i].type = TK_DEREF;
+			}
+		}
+		Log("%d, %s", tokens[i].type, tokens[i].str);
+	}
+
+	eval_status status = {true, true};
 	double value =  eval(0, nr_token - 1, &status);
+	printf("%lf", value);
 	memset(tokens, 0, sizeof(tokens));
 
-	Log("is_front_end_correct:%d," 
-		"is_main_operator_found:%d," 
-		" is_prarentthesises_legal:%d, value:%lf", status.is_front_end_correct, status.is_main_operator_found, status.is_prarentthesises_legal, value);
+	Log( "is_value_legal:%d," 
+		" is_prarentthesises_legal:%d, "
+		" value:%lf", 
+		status.is_value_legal, 
+		status.is_prarentthesises_legal,
+		value);
 
 	if (value > UINT32_MAX) {
 		return 0;
 	}
 
-	value += 0.5; // for round
+	value = value > 0 ? value + 0.5 : value - 0.5; // for round
 
 	return (word_t)value;
 }
