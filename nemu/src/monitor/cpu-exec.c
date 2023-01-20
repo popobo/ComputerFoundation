@@ -1,7 +1,9 @@
+#include "common.h"
 #include "watchpoint.h"
 #include <isa.h>
 #include <monitor/monitor.h>
 #include <monitor/difftest.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
@@ -68,16 +70,18 @@ static uint64_t get_time() {
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {
   switch (nemu_state.state) {
-    case NEMU_END: case NEMU_ABORT:
+    case NEMU_END: 
+	case NEMU_ABORT:
       printf("Program execution has ended. To restart the program, exit NEMU and run again.\n");
       return;
-    default: nemu_state.state = NEMU_RUNNING;
+    default: 
+	  nemu_state.state = NEMU_RUNNING;
   }
 
   uint64_t timer_start = get_time();
 
   for (; n > 0; n --) {
-    // vaddr_t is uint32_t, this pc is current pc in cpu
+	// vaddr_t is uint32_t, this pc is current pc in cpu
 	vaddr_t this_pc = cpu.pc;
 	
 	//Log("n:%ld, this_pc:" FMT_WORD "\n", n, this_pc);
@@ -94,7 +98,11 @@ void cpu_exec(uint64_t n) {
     asm_print(this_pc, seq_pc - this_pc, n < MAX_INSTR_TO_PRINT);
 
     /* TODO: check watchpoints here. */
-	traverse_wp();
+	if (traverse_wp() == true) {
+		nemu_state.state = NEMU_STOP;
+		break;
+	}
+
 #endif
 
 #ifdef HAS_IOE
@@ -109,8 +117,9 @@ void cpu_exec(uint64_t n) {
   g_timer += timer_end - timer_start;
 
   switch (nemu_state.state) {
-    case NEMU_RUNNING: nemu_state.state = NEMU_STOP; break;
-
+    case NEMU_RUNNING: 
+		nemu_state.state = NEMU_STOP;
+		break;
     case NEMU_END: case NEMU_ABORT:
       Log("nemu: %s\33[0m at pc = " FMT_WORD "\n\n",
           (nemu_state.state == NEMU_ABORT ? "\33[1;31mABORT" :
@@ -119,5 +128,6 @@ void cpu_exec(uint64_t n) {
       // fall through
     case NEMU_QUIT:
       monitor_statistic();
+	  break;
   }
 }

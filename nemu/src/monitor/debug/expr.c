@@ -469,6 +469,6 @@ word_t expr(char *e, bool *success) {
 	}
 
 	value = value > 0 ? value + 0.5 : value - 0.5; // for round
-
+	
 	return (word_t)value;
 }

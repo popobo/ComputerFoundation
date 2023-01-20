@@ -25,11 +25,19 @@ void isa_reg_display() {
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {
+	if (NULL == s) {
+		*success = false;
+		return 0;
+	}
+	
+	if (0 == strcmp(s, "pc"))
+		return cpu.pc;
+
 	int i = 0;
+
 	for (; i < sizeof(regs)/sizeof(regs[0]); ++i) {
-		if (0 == strcmp(s, regs[i])) {
-			break;	
-		}
+		if (0 == strcmp(s, regs[i]))
+			break;
 	}
 	if (sizeof(regs)/sizeof(regs[0]) == i) {
 		if (success != NULL)

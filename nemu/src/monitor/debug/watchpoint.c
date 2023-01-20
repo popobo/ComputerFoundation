@@ -123,19 +123,23 @@ void info_wp() {
 	}
 }
 
-void traverse_wp() {
+bool traverse_wp() {
 	WP *temp_head = head;
 	word_t value = 0;
+	bool result = false;
 	while(temp_head != NULL) {
 		value = expr(temp_head->expresson, NULL);
 		if (value != temp_head->last_expr_value) {
-			printf("NO:%d \t expresson:%s \t old value:%d\n"
-				   "NO:%d \t expresson:%s \t new value:%d\n", 
-				   temp_head->NO, temp_head->expresson, temp_head->last_expr_value, 
-				   temp_head->NO, temp_head->expresson, value);
+			printf("NO:%d\texpresson:%s\told value:%u\t0x%X\n"
+				   "NO:%d\texpresson:%s\tnew value:%u\t0x%X\n", 
+				   temp_head->NO, temp_head->expresson, temp_head->last_expr_value, temp_head->last_expr_value,
+				   temp_head->NO, temp_head->expresson, value, value);
 			temp_head->last_expr_value = value;
+			result = true;
 		}
 		temp_head = temp_head->next;
 	}
+	
+	return result;
 }
 

@@ -192,7 +192,7 @@ static int cmd_p(char *args) {
 
 	word_t value = expr(args, &isExprSuc);	
 	
-	printf("value:%d\n", value);
+	printf("%u\t\t0x%X\n", value, value);
 
 	return 0;
 }

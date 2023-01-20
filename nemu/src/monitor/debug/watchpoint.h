@@ -23,6 +23,6 @@ bool free_wp_by_no(int no);
 
 void info_wp();
 
-void traverse_wp();
+bool traverse_wp();
 
 #endif
